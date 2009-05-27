@@ -25,11 +25,11 @@ has 'id_cols' => (
 
 =head1 VERSION
 
-Version 0.999001
+Version 0.999002
 
 =cut
 
-our $VERSION = '0.999001';
+our $VERSION = '0.999002';
 
 =head1 NAME
 
@@ -56,7 +56,7 @@ DBIx::Class::ResultSet::WithMetaData
 
   # then somewhere else
 
-  my $object_type_arrayref = $object_type_rs->limit(count => 3)->with_substr->display();
+  my $object_type_arrayref = $object_type_rs->with_substr->display();
 
   # [{
   #    'artistid' => '1',
@@ -169,47 +169,6 @@ method add_row_info (Int :$id, :$row, HashRef :$info) {
 
 method row_info_for (Int :$id) {
   return $self->_row_info->{$id};
-}
-
-=head2 order_by (EXPERIMENTAL)
-
-=over 4
-
-=item Arguments: col => $column_name
-
-=item Return Value: ResultSet
-
-=back
-
- $ordered_rs = $rs->order_by(col => 'name');
-
-Convenience method. Essentually a shortcut for $rs->search({}, { order_by => $col }).
-
-=cut
-
-method order_by (Str :$col) {
-  $col = "me.$col" unless ($col =~ m/\./);
-  return $self->search({}, { order_by => $col });
-}
-
-=head2 limit (EXPERIMENTAL)
-
-=over 4
-
-=item Arguments: count => Int
-
-=item Return Value: ResultSet
-
-=back
-
- $limitted_rs = $rs->limit(count => 3);
-
-Convenience method. Essentually a shortcut for $rs->search({}, { rows => $count }).
-
-=cut
-
-method limit (Int :$count) {
-  return $self->search({}, { rows => $count });
 }
 
 method _mk_id (HashRef :$row) {

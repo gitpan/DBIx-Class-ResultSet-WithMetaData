@@ -9,7 +9,7 @@ use Data::Dumper;
 ok(my $schema = DBICTest->init_schema(), 'got schema');
 
 {
-	my $artist_rs = $schema->resultset('Artist')->order_by(col => 'artistid')->display();
+	my $artist_rs = $schema->resultset('Artist')->search({}, { order_by => 'artistid' })->display();
 	is_deeply($artist_rs, [
 		{
 			'artistid' => '1',
@@ -27,7 +27,7 @@ ok(my $schema = DBICTest->init_schema(), 'got schema');
 }
 
 {
-	my $artists = $schema->resultset('Artist')->order_by(col => 'artistid')->with_substr->display();
+	my $artists = $schema->resultset('Artist')->search({}, { order_by => 'artistid' })->with_substr->display();
 	is_deeply($artists, [
 		{
 			'artistid' => '1',
