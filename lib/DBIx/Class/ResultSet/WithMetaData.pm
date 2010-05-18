@@ -5,7 +5,7 @@ use warnings;
 
 use Data::Alias;
 use Moose;
-use MooseX::Method::Signatures;
+use Method::Signatures::Simple;
 extends 'DBIx::Class::ResultSet';
 
 has '_row_info' => (
@@ -25,11 +25,11 @@ has 'id_cols' => (
 
 =head1 VERSION
 
-Version 0.999002
+Version 0.999003
 
 =cut
 
-our $VERSION = '0.999002';
+our $VERSION = '0.999003';
 
 =head1 NAME
 
@@ -152,11 +152,13 @@ with that row when the ResultSet is flattened to a datastructure with L</display
 
 =cut
 
-method add_row_info (Int :$id, :$row, HashRef :$info) {
+method add_row_info (%opts) {
+  my ($row, $id, $info) = map { $opts{$_} } qw/row id info/;
   if ($row) {
     $id = $self->_mk_id(row => { $row->get_columns });
   }
-  unless ($self->find($id)) {
+
+  unless ($row || $self->find($id)) {
     die 'invalid id passed to add_row_info';
   }
 
@@ -167,11 +169,13 @@ method add_row_info (Int :$id, :$row, HashRef :$info) {
   $self->_row_info->{$id} = $info;  
 }
 
-method row_info_for (Int :$id) {
+method row_info_for (%opts) {
+  my $id = $opts{id};
   return $self->_row_info->{$id};
 }
 
-method _mk_id (HashRef :$row) {
+method _mk_id (%opts) {
+  my $row = $opts{row};
   return join('-', map { $row->{$_} } @{$self->id_cols});
 }
 

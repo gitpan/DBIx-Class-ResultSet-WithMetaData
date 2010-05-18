@@ -1,6 +1,6 @@
 #!perl
 
-use Test::More tests => 3;
+use Test::More;
 use lib qw(t/lib);
 use DBICTest;
 use Data::Dumper;
@@ -47,5 +47,35 @@ ok(my $schema = DBICTest->init_schema(), 'got schema');
 	], 'display with substring okay');
 }
 
+{
+	my $artists = $schema->resultset('Artist')->search({}, { order_by => 'artistid' })->with_substr->search({}, { prefetch => 'cds', rows => 1 })->display();
+	is_deeply($artists, [
+      { 
+        'artistid' => 1,
+        'cds' => [ 
+          { 
+            'cdid' => 3,
+            'artist' => 1,
+            'title' => 'Caterwaulin\' Blues',
+            'year' => '1997'
+          },
+          { 
+            'cdid' => 1,
+            'artist' => 1,
+            'title' => 'Spoonful of bees',
+            'year' => '1999'
+          },
+          { 
+            'cdid' => 2,
+            'artist' => 1,
+            'title' => 'Forkful of bees',
+            'year' => '2001'
+          }
+        ],
+        'name' => 'Caterwauler McCrae',
+        'substr' => 'Cat'
+      }
+	], 'substring before prefetch okay');
+}
 
-
+done_testing();

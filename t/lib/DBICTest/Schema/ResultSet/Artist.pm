@@ -1,7 +1,7 @@
 package DBICTest::Schema::ResultSet::Artist;
 
 use Moose;
-use MooseX::Method::Signatures;
+use Method::Signatures::Simple;
 extends 'DBICTest::Schema::ResultSet';
 
 method with_substr () {
