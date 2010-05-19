@@ -27,7 +27,31 @@ ok(my $schema = DBICTest->init_schema(), 'got schema');
 }
 
 {
-	my $artists = $schema->resultset('Artist')->search({}, { order_by => 'artistid' })->with_substr->display();
+	my $artists = $schema->resultset('Artist')->search({}, { order_by => 'artistid' })->with_substr_multi->display();
+	is_deeply($artists, [
+		{
+			'artistid' => '1',
+			'name' => 'Caterwauler McCrae',
+			'substr' => 'Cat',
+			'substr2' => 'Cate'
+		},
+		{
+			'artistid' => '2',
+			'name' => 'Random Boy Band',
+			'substr' => 'Ran',
+			'substr2' => 'Rand'
+		},
+		{
+			'artistid' => '3',
+			'name' => 'We Are Goth',
+			'substr' => 'We ',
+			'substr2' => 'We A'
+		}
+	], 'display with substring using _with_meta_hash okay');
+}
+
+{
+	my $artists = $schema->resultset('Artist')->search({}, { order_by => 'artistid' })->with_substr_key->display();
 	is_deeply($artists, [
 		{
 			'artistid' => '1',
@@ -44,11 +68,32 @@ ok(my $schema = DBICTest->init_schema(), 'got schema');
 			'name' => 'We Are Goth',
 			'substr' => 'We '
 		}
-	], 'display with substring okay');
+	], 'display with substring using _with_meta_key okay');
 }
 
+# {
+# 	my $artists = $schema->resultset('Artist')->search({}, { order_by => 'artistid' })->with_substr_old->display();
+# 	is_deeply($artists, [
+# 		{
+# 			'artistid' => '1',
+# 			'name' => 'Caterwauler McCrae',
+# 			'substr' => 'Cat'
+# 		},
+# 		{
+# 			'artistid' => '2',
+# 			'name' => 'Random Boy Band',
+# 			'substr' => 'Ran'
+# 		},
+# 		{
+# 			'artistid' => '3',
+# 			'name' => 'We Are Goth',
+# 			'substr' => 'We '
+# 		}
+# 	], 'display with substring okay');
+# }
+
 {
-	my $artists = $schema->resultset('Artist')->search({}, { order_by => 'artistid' })->with_substr->search({}, { prefetch => 'cds', rows => 1 })->display();
+	my $artists = $schema->resultset('Artist')->search({}, { order_by => 'artistid' })->with_substr_key->search({}, { prefetch => 'cds', rows => 1 })->display();
 	is_deeply($artists, [
       { 
         'artistid' => 1,

@@ -23,13 +23,23 @@ has 'id_cols' => (
   isa => 'ArrayRef',
 );
 
+has '_hash_modifiers' => (
+  is => 'rw',
+  isa => 'ArrayRef',
+);
+
+has '_key_modifiers' => (
+  is => 'rw',
+  isa => 'ArrayRef',
+);
+
 =head1 VERSION
 
-Version 0.999003
+Version 1.000000
 
 =cut
 
-our $VERSION = '0.999003';
+our $VERSION = '1.000000';
 
 =head1 NAME
 
@@ -44,10 +54,11 @@ DBIx::Class::ResultSet::WithMetaData
   extends 'DBIx::Class::ResultSet::WithMetaData;
 
   method with_substr () {
-    foreach my $row ($self->all) {
-      my $substr = substr($row->name, 0, 3);
-      $self->add_row_info(row => $row, info => { substr => $substr });
-    }
+    $self->build_metadata( modifier => sub () {
+      my $row = shift;
+      $row->{substr} = substr($row->{name}, 0, 3);
+      return $row;
+    });
     return $self;
   }
 
@@ -88,12 +99,19 @@ sub new {
   my $self = shift;
 
   my $new = $self->next::method(@_);
-  foreach my $key (qw/_row_info was_row id_cols/) {
+  foreach my $key (qw/_row_info was_row id_cols _key_modifiers _hash_modifiers/) {
     alias $new->{$key} = $new->{attrs}{$key};
   }
 
   unless ($new->_row_info) {
     $new->_row_info({});
+  }
+
+  unless ($new->_key_modifiers) {
+    $new->_key_modifiers([]);
+  }
+  unless ($new->_hash_modifiers) {
+    $new->_hash_modifiers([]);
   }
 
   unless ($new->id_cols && scalar(@{$new->id_cols})) {
@@ -126,8 +144,28 @@ method display () {
   $rs->result_class('DBIx::Class::ResultClass::HashRefInflator');
   my @rows;
   foreach my $row ($rs->all) {
+    # THIS BLOCK IS DEPRECATED
     if (my $info = $self->row_info_for(id => $self->_mk_id(row => $row))) {
       $row = { %{$row}, %{$info} };
+    }
+
+    foreach my $modifier (@{$rs->_hash_modifiers}) {
+      my $row_hash = $modifier->($row);
+      if (ref $row_hash ne 'HASH') {
+        die 'modifier subref (added via build_metadata) did not return hashref';
+      }
+
+      # simple merge for now, potentially needs to be more complex
+      $row->{$_} = $row_hash->{$_} for keys %{$row_hash};
+    }
+
+    foreach my $params (@{$rs->_key_modifiers}) {
+      my $modifier = $params->{modifier};
+      my $key = $params->{key};
+
+      if (my $val = $modifier->($row)) {
+        $row->{$key} = $val;
+      }
     }
     push(@rows, $row);
   }
@@ -135,7 +173,70 @@ method display () {
   return ($self->was_row) ? $rows[0] : \@rows;
 }
 
-=head2 add_row_info
+=head2 _with_meta_key
+
+=over 4
+
+=item Arguments: key_name => subref($row_hash)
+
+=item Return Value: ResultSet
+
+=back
+
+ $self->_with_meta_key( substr => sub ($row) { 
+   return substr(shift->{name}, 0, 3);
+ });
+
+This method allows you populate a certain key for each row hash at  L</display> time.
+
+=cut
+
+method _with_meta_key ($key, $modifier) {
+  my $rs = $self->search({});
+  unless ($key) {
+    die 'build_metadata called without key';
+  }
+
+  unless ($modifier && (ref $modifier eq 'CODE')) {
+    die 'build_metadata called without modifier param';
+  }
+
+  push( @{$rs->_key_modifiers}, { key => $key, modifier => $modifier });
+  return $rs;
+}
+
+=head2 _with_meta_hash
+
+=over 4
+
+=item Arguments: subref($row_hash)
+
+=item Return Value: ResultSet
+
+=back
+
+ $self->_with_meta_hash( sub ($row) { 
+   my $row = shift;
+   my $return_hash = { substr => substr($row->{name}, 0, 3), substr2 => substr($row->{name}, 0, 4) };
+   return $return_hash;
+ });
+
+Use this method when you want to populate multiple keys of the hash at the same time. If you just want to 
+populate one key, use L</_with_meta_key>.
+
+=cut
+
+method _with_meta_hash ($modifier) {
+  my $rs = $self->search({});
+  unless ($modifier && (ref $modifier eq 'CODE')) {
+    die 'build_metadata called without modifier param';
+  }
+
+  push( @{$rs->_hash_modifiers}, $modifier );
+  return $rs;
+}
+
+=head2 add_row_info (DEPRECATED)
 
 =over 4
 
@@ -147,13 +248,15 @@ method display () {
 
  $rs = $rs->add_row_info(row => $row, info => { dates => [qw/mon weds fri/] } );
 
-This method allows you to attach a HashRef of metadata to a row which will be merged
-with that row when the ResultSet is flattened to a datastructure with L</display>.
+DEPRECATED - this method is quite slow as it requires that you iterate through 
+the resultset each time you want to add metadata. Replaced by L</build_metadata>.
 
 =cut
 
 method add_row_info (%opts) {
   my ($row, $id, $info) = map { $opts{$_} } qw/row id info/;
+
+  warn 'DEPRECATED - add_row_info is deprecated in favour of build_metadata';
   if ($row) {
     $id = $self->_mk_id(row => { $row->get_columns });
   }
@@ -169,11 +272,13 @@ method add_row_info (%opts) {
   $self->_row_info->{$id} = $info;  
 }
 
+# DEPRECATED
 method row_info_for (%opts) {
   my $id = $opts{id};
   return $self->_row_info->{$id};
 }
 
+# DEPRECATED
 method _mk_id (%opts) {
   my $row = $opts{row};
   return join('-', map { $row->{$_} } @{$self->id_cols});
