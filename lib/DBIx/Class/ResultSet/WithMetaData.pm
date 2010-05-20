@@ -35,11 +35,11 @@ has '_key_modifiers' => (
 
 =head1 VERSION
 
-Version 1.000000
+Version 1.000001
 
 =cut
 
-our $VERSION = '1.000000';
+our $VERSION = '1.000001';
 
 =head1 NAME
 
@@ -54,12 +54,11 @@ DBIx::Class::ResultSet::WithMetaData
   extends 'DBIx::Class::ResultSet::WithMetaData;
 
   method with_substr () {
-    $self->build_metadata( modifier => sub () {
-      my $row = shift;
-      $row->{substr} = substr($row->{name}, 0, 3);
-      return $row;
-    });
-    return $self;
+    return $self->_with_meta_key( 
+      substr => sub {
+        return substr(shift->{name}, 0, 3);
+      }
+    );
   }
 
   ...
