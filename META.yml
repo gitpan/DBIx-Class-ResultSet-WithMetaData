@@ -21,7 +21,7 @@ no_index:
 provides:
   DBIx::Class::ResultSet::WithMetaData:
     file: lib/DBIx/Class/ResultSet/WithMetaData.pm
-    version: 1.000001
+    version: 1.000002
 requires:
   DBIx::Class: 0.081
   DBIx::Class::ResultClass::HashRefInflator: 0
@@ -30,4 +30,4 @@ requires:
   perl: 5.6.1
 resources:
   license: http://dev.perl.org/licenses/
-version: 1.000001
+version: 1.000002

@@ -35,11 +35,11 @@ has '_key_modifiers' => (
 
 =head1 VERSION
 
-Version 1.000001
+Version 1.000002
 
 =cut
 
-our $VERSION = '1.000001';
+our $VERSION = '1.000002';
 
 =head1 NAME
 
@@ -87,7 +87,7 @@ DBIx::Class::ResultSet::WithMetaData
 =head1 DESCRIPTION
 
 Attach metadata to rows by chaining ResultSet methods together. When the ResultSet is
-flattened to an ArrayRef the attached metadata is merged with the row hashes to give
+flattened to an ArrayRef the metadata is merged with the row hashes to give
 a combined 'hash-plus-other-stuff' representation.
 
 =head1 METHODS
@@ -133,8 +133,9 @@ sub new {
  $arrayref_of_row_hashrefs = $rs->display();
 
 This method uses L<DBIx::Class::ResultClass::HashRefInflator> to convert all
-rows in the ResultSet to HashRefs. These are then merged with any metadata
-that had been attached to the rows using L</add_row_info>.
+rows in the ResultSet to HashRefs. Then the subrefs that were added via 
+L</_with_meta_key> or L</_with_meta_hash> are run for each row and the
+resulting data merged with them.
 
 =cut
 
