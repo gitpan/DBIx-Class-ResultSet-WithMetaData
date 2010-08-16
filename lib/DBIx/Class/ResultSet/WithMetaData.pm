@@ -33,13 +33,23 @@ has '_key_modifiers' => (
   isa => 'ArrayRef',
 );
 
+has '_object_hash_modifiers' => (
+  is => 'rw',
+  isa => 'ArrayRef',
+);
+
+has '_object_key_modifiers' => (
+  is => 'rw',
+  isa => 'ArrayRef',
+);
+
 =head1 VERSION
 
-Version 1.000002
+Version 1.001000
 
 =cut
 
-our $VERSION = '1.000002';
+our $VERSION = '1.001000';
 
 =head1 NAME
 
@@ -98,7 +108,7 @@ sub new {
   my $self = shift;
 
   my $new = $self->next::method(@_);
-  foreach my $key (qw/_row_info was_row id_cols _key_modifiers _hash_modifiers/) {
+  foreach my $key (qw/_row_info was_row id_cols _key_modifiers _hash_modifiers _object_key_modifiers _object_hash_modifiers/) {
     alias $new->{$key} = $new->{attrs}{$key};
   }
 
@@ -111,6 +121,12 @@ sub new {
   }
   unless ($new->_hash_modifiers) {
     $new->_hash_modifiers([]);
+  }
+  unless ($new->_object_key_modifiers) {
+    $new->_object_key_modifiers([]);
+  }
+  unless ($new->_object_hash_modifiers) {
+    $new->_object_hash_modifiers([]);
   }
 
   unless ($new->id_cols && scalar(@{$new->id_cols})) {
@@ -141,9 +157,12 @@ resulting data merged with them.
 
 method display () {
   my $rs = $self->search({});
-  $rs->result_class('DBIx::Class::ResultClass::HashRefInflator');
+#  $rs->result_class('DBIx::Class::ResultClass::HashRefInflator');
+  $rs->result_class('DBIx::Class::WithMetaData::Inflator');
   my @rows;
-  foreach my $row ($rs->all) {
+  foreach my $row_rep ($rs->all) {
+    # the custom inflator inflates to a arrayref with two versions of the row in it - hash and obj
+    my ($row, $row_obj) = @{$row_rep};
     # THIS BLOCK IS DEPRECATED
     if (my $info = $self->row_info_for(id => $self->_mk_id(row => $row))) {
       $row = { %{$row}, %{$info} };
@@ -159,11 +178,30 @@ method display () {
       $row->{$_} = $row_hash->{$_} for keys %{$row_hash};
     }
 
+    foreach my $modifier (@{$rs->_object_hash_modifiers}) {
+      my $row_hash = $modifier->($row, $row_obj);
+      if (ref $row_hash ne 'HASH') {
+        die 'modifier subref (added via build_metadata) did not return hashref';
+      }
+
+      # simple merge for now, potentially needs to be more complex
+      $row->{$_} = $row_hash->{$_} for keys %{$row_hash};
+    }
+
     foreach my $params (@{$rs->_key_modifiers}) {
       my $modifier = $params->{modifier};
       my $key = $params->{key};
 
       if (my $val = $modifier->($row)) {
+        $row->{$key} = $val;
+      }
+    }
+
+    foreach my $params (@{$rs->_object_key_modifiers}) {
+      my $modifier = $params->{modifier};
+      my $key = $params->{key};
+
+      if (my $val = $modifier->($row, $row_obj)) {
         $row->{$key} = $val;
       }
     }
@@ -205,6 +243,41 @@ method _with_meta_key ($key, $modifier) {
   return $rs;
 }
 
+=head2 _with_object_meta_key
+
+=over 4
+
+=item Arguments: key_name => subref($row_hash, $row_obj)
+
+=item Return Value: ResultSet
+
+=back
+
+ $self->_with_object_meta_key( substr => sub { 
+   my ($row_hash, $row_obj) = @_;
+   return substr($row_obj->row_method, 0, 3);
+ });
+
+The same as L</_with_meta_key> but the subref gets the row object
+as well as the row hash. This should only be used when you need to
+access row methods as it's slower to inflate objects.
+
+=cut
+
+method _with_object_meta_key ($key, $modifier) {
+  my $rs = $self->search({});
+  unless ($key) {
+    die '_with_object_meta_key called without key';
+  }
+
+  unless ($modifier && (ref $modifier eq 'CODE')) {
+    die '_with_object_meta_key called without modifier param';
+  }
+
+  push( @{$rs->_object_key_modifiers}, { key => $key, modifier => $modifier });
+  return $rs;
+}
+
 =head2 _with_meta_hash
 
 =over 4
@@ -233,6 +306,39 @@ method _with_meta_hash ($modifier) {
   }
 
   push( @{$rs->_hash_modifiers}, $modifier );
+  return $rs;
+}
+
+=head2 _with_object_meta_hash
+
+=over 4
+
+=item Arguments: subref($row_hash, $row_object)
+
+=item Return Value: ResultSet
+
+=back
+
+ $self->_with_object_meta_hash( sub { 
+   my ($row_hash, $row_object) = @_;
+
+   my $return_hash = { substr => substr($row_object->name, 0, 3), substr2 => substr($row_hash->{name}, 0, 4) };
+   return $return_hash;
+ });
+
+Like L</_with_meta_hash> but the subref gets the row object
+as well as the row hash. This should only be used when you need to
+access row methods as it's slower to inflate objects.
+
+=cut
+
+method _with_object_meta_hash ($modifier) {
+  my $rs = $self->search({});
+  unless ($modifier && (ref $modifier eq 'CODE')) {
+    die 'build_metadata called without modifier param';
+  }
+
+  push( @{$rs->_object_hash_modifiers}, $modifier );
   return $rs;
 }
 
